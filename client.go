@@ -10,17 +10,37 @@ import (
 )
 
 const (
-	DefaultEndPoint = "/druid/v2"
+	DefaultEndPoint             = "/druid/v2"
+	DEFAULT_MaxIdleConns        = 1000
+	DEFAULT_MaxIdleConnsPerHost = 300
+	DEFAULT_TIMEOUT             = 60
 )
+
+// reuse http client to reuse tcp connections.
+var httpClient *http.Client
+
+func init() {
+	// Customize the Transport to have larger connection pool
+	defaultRoundTripper := http.DefaultTransport
+	defaultTransportPointer, ok := defaultRoundTripper.(*http.Transport)
+	if !ok {
+		panic("defaultRoundTripper not an *http.Transport")
+	}
+	defaultTransport := *defaultTransportPointer // dereference it to get a copy of the struct that the pointer points to
+	defaultTransport.MaxIdleConns = DEFAULT_MaxIdleConns
+	defaultTransport.MaxIdleConnsPerHost = DEFAULT_MaxIdleConnsPerHost
+	httpClient = &http.Client{Transport: &defaultTransport, Timeout: DEFAULT_TIMEOUT * time.Second}
+}
 
 type Client struct {
 	Url      string
 	EndPoint string
 	Timeout  time.Duration
 
-	Debug        bool
-	LastRequest  string
-	LastResponse string
+	Debug                bool
+	UseDefaultHTTPClient bool
+	LastRequest          string
+	LastResponse         string
 }
 
 func (c *Client) Query(query Query) (err error) {
@@ -55,15 +75,17 @@ func (c *Client) QueryRaw(req []byte) (result []byte, err error) {
 		return
 	}
 
-	// By default, use 60 second timeout unless specified otherwise
-	// by the caller
-	clientTimeout := 60 * time.Second
-	if c.Timeout != 0 {
-		clientTimeout = c.Timeout
-	}
+	if !c.UseDefaultHTTPClient {
+		// By default, use 60 second timeout unless specified otherwise
+		// by the caller
+		clientTimeout := DEFAULT_TIMEOUT * time.Second
+		if c.Timeout != 0 {
+			clientTimeout = c.Timeout
+		}
 
-	httpClient := &http.Client{
-		Timeout: clientTimeout,
+		httpClient = &http.Client{
+			Timeout: clientTimeout,
+		}
 	}
 
 	resp, err := httpClient.Post(c.Url+endPoint, "application/json", bytes.NewBuffer(req))
