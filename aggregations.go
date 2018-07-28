@@ -13,6 +13,7 @@ type Aggregation struct {
 	FnCombine   string   `json:"fnCombine,omitempty"`
 	FnReset     string   `json:"fnReset,omitempty"`
 	ByRow       bool     `json:"byRow,omitempty"`
+	Round       bool     `json:"round,omitempty"`
 }
 
 func AggRawJson(rawJson string) Aggregation {
@@ -81,5 +82,14 @@ func AggCardinality(name string, fieldNames []string, byRow ...bool) Aggregation
 		Name:       name,
 		FieldNames: fieldNames,
 		ByRow:      isByRow,
+	}
+}
+
+func AggHyperUnique(name, fieldName string, round bool) Aggregation {
+	return Aggregation{
+		Type:      "hyperUnique",
+		Name:      name,
+		FieldName: fieldName,
+		Round:     round,
 	}
 }
