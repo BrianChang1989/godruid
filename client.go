@@ -32,7 +32,7 @@ const (
 //	httpClient = &http.Client{Transport: &defaultTransport, Timeout: DEFAULT_TIMEOUT * time.Second}
 //}
 
-type nClient struct {
+type NClient struct {
 	Url        string
 	EndPoint   string
 	Timeout    time.Duration
@@ -42,8 +42,8 @@ type nClient struct {
 	//LastResponse         string
 }
 
-func NewClient(url string, endPoint string, debug bool, timeout int, maxIdleConns int, maxIdleConnsPerHost int) (client *nClient) {
-	client = &nClient{Url: url, EndPoint: endPoint, Debug: debug, Timeout: time.Duration(timeout)}
+func NewClient(url string, endPoint string, debug bool, timeout int, maxIdleConns int, maxIdleConnsPerHost int) (client *NClient) {
+	client = &NClient{Url: url, EndPoint: endPoint, Debug: debug, Timeout: time.Duration(timeout)}
 	// Customize the Transport to have larger connection pool
 	defaultRoundTripper := http.DefaultTransport
 	defaultTransportPointer, ok := defaultRoundTripper.(*http.Transport)
@@ -148,7 +148,7 @@ func (c *Client) QueryRaw(req []byte) (result []byte, err error) {
 	return
 }
 
-func (c *nClient) Query(query Query) (request []byte, result []byte, err error) {
+func (c *NClient) Query(query Query) (request []byte, result []byte, err error) {
 	query.setup()
 	var reqJson []byte
 	if c.Debug {
@@ -169,7 +169,7 @@ func (c *nClient) Query(query Query) (request []byte, result []byte, err error) 
 	return
 }
 
-func (c *nClient) QueryRaw(req []byte) (request []byte, result []byte, err error) {
+func (c *NClient) QueryRaw(req []byte) (request []byte, result []byte, err error) {
 	if c.EndPoint == "" {
 		c.EndPoint = DefaultEndPoint
 	}
