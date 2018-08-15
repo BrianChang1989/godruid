@@ -17,9 +17,33 @@ const (
 )
 
 // reuse http client to reuse tcp connections.
-var httpClient *http.Client
+//var httpClient *http.Client
 
-func init() {
+//func init() {
+//	// Customize the Transport to have larger connection pool
+//	defaultRoundTripper := http.DefaultTransport
+//	defaultTransportPointer, ok := defaultRoundTripper.(*http.Transport)
+//	if !ok {
+//		panic("defaultRoundTripper not an *http.Transport")
+//	}
+//	defaultTransport := *defaultTransportPointer // dereference it to get a copy of the struct that the pointer points to
+//	defaultTransport.MaxIdleConns = DEFAULT_MaxIdleConns
+//	defaultTransport.MaxIdleConnsPerHost = DEFAULT_MaxIdleConnsPerHost
+//	httpClient = &http.Client{Transport: &defaultTransport, Timeout: DEFAULT_TIMEOUT * time.Second}
+//}
+
+type nClient struct {
+	Url        string
+	EndPoint   string
+	Timeout    time.Duration
+	Debug      bool
+	httpClient *http.Client
+	//LastRequest          string
+	//LastResponse         string
+}
+
+func NewClient(url string, endPoint string, debug bool, timeout int, maxIdleConns int, maxIdleConnsPerHost int) (client *nClient) {
+	client = &nClient{Url: url, EndPoint: endPoint, Debug: debug, Timeout: time.Duration(timeout)}
 	// Customize the Transport to have larger connection pool
 	defaultRoundTripper := http.DefaultTransport
 	defaultTransportPointer, ok := defaultRoundTripper.(*http.Transport)
@@ -27,9 +51,11 @@ func init() {
 		panic("defaultRoundTripper not an *http.Transport")
 	}
 	defaultTransport := *defaultTransportPointer // dereference it to get a copy of the struct that the pointer points to
-	defaultTransport.MaxIdleConns = DEFAULT_MaxIdleConns
-	defaultTransport.MaxIdleConnsPerHost = DEFAULT_MaxIdleConnsPerHost
-	httpClient = &http.Client{Transport: &defaultTransport, Timeout: DEFAULT_TIMEOUT * time.Second}
+	defaultTransport.MaxIdleConns = maxIdleConns
+	defaultTransport.MaxIdleConnsPerHost = maxIdleConnsPerHost
+	httpClient := &http.Client{Transport: &defaultTransport, Timeout: time.Duration(timeout) * time.Second}
+	client.httpClient = httpClient
+	return
 }
 
 type Client struct {
@@ -75,18 +101,29 @@ func (c *Client) QueryRaw(req []byte) (result []byte, err error) {
 		return
 	}
 
-	if !c.UseDefaultHTTPClient {
-		// By default, use 60 second timeout unless specified otherwise
-		// by the caller
-		clientTimeout := DEFAULT_TIMEOUT * time.Second
-		if c.Timeout != 0 {
-			clientTimeout = c.Timeout
-		}
-
-		httpClient = &http.Client{
-			Timeout: clientTimeout,
-		}
+	// By default, use 60 second timeout unless specified otherwise
+	// by the caller
+	clientTimeout := DEFAULT_TIMEOUT * time.Second
+	if c.Timeout != 0 {
+		clientTimeout = c.Timeout
 	}
+
+	httpClient := &http.Client{
+		Timeout: clientTimeout,
+	}
+
+	//if !c.UseDefaultHTTPClient {
+	//	// By default, use 60 second timeout unless specified otherwise
+	//	// by the caller
+	//	clientTimeout := DEFAULT_TIMEOUT * time.Second
+	//	if c.Timeout != 0 {
+	//		clientTimeout = c.Timeout
+	//	}
+	//
+	//	httpClient = &http.Client{
+	//		Timeout: clientTimeout,
+	//	}
+	//}
 
 	resp, err := httpClient.Post(c.Url+endPoint, "application/json", bytes.NewBuffer(req))
 	if err != nil {
@@ -106,6 +143,65 @@ func (c *Client) QueryRaw(req []byte) (result []byte, err error) {
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("%s: %s", resp.Status, string(result))
+	}
+
+	return
+}
+
+func (c *nClient) Query(query Query) (request []byte, result []byte, err error) {
+	query.setup()
+	var reqJson []byte
+	if c.Debug {
+		reqJson, err = json.MarshalIndent(query, "", "  ")
+	} else {
+		reqJson, err = json.Marshal(query)
+	}
+	//reqJson, err = json.Marshal(query)
+	if err != nil {
+		return
+	}
+	request, result, err = c.QueryRaw(reqJson)
+	if err != nil {
+		return
+	}
+
+	err = query.onResponse(result)
+	return
+}
+
+func (c *nClient) QueryRaw(req []byte) (request []byte, result []byte, err error) {
+	if c.EndPoint == "" {
+		c.EndPoint = DefaultEndPoint
+	}
+	endPoint := c.EndPoint
+	if c.Debug {
+		endPoint += "?pretty"
+		request = req
+		//c.LastRequest = string(req)
+	}
+	if err != nil {
+		return
+	}
+
+	resp, err := c.httpClient.Post(c.Url+endPoint, "application/json", bytes.NewBuffer(req))
+	if err != nil {
+		return
+	}
+	defer func() {
+		resp.Body.Close()
+	}()
+
+	result, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+	//if c.Debug {
+	//c.LastResponse = string(result)
+	//}
+
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("%s: %s", resp.Status, string(result))
+		return
 	}
 
 	return
