@@ -148,7 +148,7 @@ func (c *Client) QueryRaw(req []byte) (result []byte, err error) {
 	return
 }
 
-func (c *NClient) Query(query Query) (request []byte, result []byte, err error) {
+func (c *NClient) Query(query Query) (request string, response string, err error) {
 	query.setup()
 	var reqJson []byte
 	if c.Debug {
@@ -160,11 +160,12 @@ func (c *NClient) Query(query Query) (request []byte, result []byte, err error) 
 	if err != nil {
 		return
 	}
-	request, result, err = c.QueryRaw(reqJson)
+	req, result, err := c.QueryRaw(reqJson)
 	if err != nil {
 		return
 	}
-
+	request = string(req)
+	response = string(result)
 	err = query.onResponse(result)
 	return
 }
