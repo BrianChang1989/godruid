@@ -161,11 +161,11 @@ func (c *NClient) Query(query Query) (request string, response string, err error
 		return
 	}
 	req, result, err := c.QueryRaw(reqJson)
+	request = string(req)
+	response = string(result)
 	if err != nil {
 		return
 	}
-	request = string(req)
-	response = string(result)
 	err = query.onResponse(result)
 	return
 }
