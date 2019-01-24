@@ -68,7 +68,7 @@ func NewClient(url string, endPoint string, debug bool, timeout int, maxIdleConn
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
-	httpClient := &http.Client{Transport: &transport, Timeout: time.Duration(timeout) * time.Second}
+	httpClient := &http.Client{Transport: transport, Timeout: time.Duration(timeout) * time.Second}
 	client.httpClient = httpClient
 	return
 }
