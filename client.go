@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"time"
+	"net"
 )
 
 const (
@@ -44,16 +45,30 @@ type NClient struct {
 
 func NewClient(url string, endPoint string, debug bool, timeout int, maxIdleConns int, maxIdleConnsPerHost int) (client *NClient) {
 	client = &NClient{Url: url, EndPoint: endPoint, Debug: debug, Timeout: time.Duration(timeout)}
-	// Customize the Transport to have larger connection pool
-	defaultRoundTripper := http.DefaultTransport
-	defaultTransportPointer, ok := defaultRoundTripper.(*http.Transport)
-	if !ok {
-		panic("defaultRoundTripper not an *http.Transport")
+	if maxIdleConns < 1 {
+		maxIdleConns = DEFAULT_MaxIdleConns
 	}
-	defaultTransport := *defaultTransportPointer // dereference it to get a copy of the struct that the pointer points to
-	defaultTransport.MaxIdleConns = maxIdleConns
-	defaultTransport.MaxIdleConnsPerHost = maxIdleConnsPerHost
-	httpClient := &http.Client{Transport: &defaultTransport, Timeout: time.Duration(timeout) * time.Second}
+	if maxIdleConnsPerHost < 1 {
+		maxIdleConnsPerHost = DEFAULT_MaxIdleConnsPerHost
+	}
+	if timeout < 1 {
+		timeout = DEFAULT_TIMEOUT
+	}
+	// Customize the Transport to have larger connection pool
+	var transport http.RoundTripper = &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          maxIdleConns,
+		MaxIdleConnsPerHost:   maxIdleConnsPerHost,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+	httpClient := &http.Client{Transport: &transport, Timeout: time.Duration(timeout) * time.Second}
 	client.httpClient = httpClient
 	return
 }
